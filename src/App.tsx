@@ -9,7 +9,7 @@ import type { Product, SearchFilters, CustomerInfo } from './backend';
 export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('all');
-  const [activeRoast, setActiveRoast] = useState<string>('all');
+
   const [sortBy, setSortBy] = useState<string>('rating');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showCart, setShowCart] = useState(false);
@@ -22,9 +22,8 @@ export default function App() {
   const filters: SearchFilters = useMemo(() => ({
     query: debouncedSearch || undefined,
     category: activeCategory !== 'all' ? activeCategory as Product['category'] : undefined,
-    roast: activeRoast !== 'all' ? activeRoast as 'light' | 'medium' | 'dark' : undefined,
     sortBy: sortBy as SearchFilters['sortBy'],
-  }), [debouncedSearch, activeCategory, activeRoast, sortBy]);
+  }), [debouncedSearch, activeCategory, sortBy]);
 
   const { products, loading } = useProducts(filters);
   const { items: cartItems, total: cartTotal, count: cartCount, addItem, updateQuantity, removeItem, clearCart } = useCart();
@@ -210,29 +209,6 @@ export default function App() {
             ))}
           </div>
 
-          {/* Roast Filters */}
-          <div className="flex flex-wrap gap-2">
-            {[
-              { value: 'all', label: 'Any Roast' },
-              { value: 'light', label: '☀️ Light' },
-              { value: 'medium', label: '🌤️ Medium' },
-              { value: 'dark', label: '🌙 Dark' },
-            ].map((roast) => (
-              <button
-                key={roast.value}
-                onClick={() => setActiveRoast(roast.value)}
-                className="px-3 py-2 rounded-full text-sm transition-all"
-                style={
-                  activeRoast === roast.value
-                    ? { backgroundColor: 'var(--color-accent)', color: 'var(--color-text)', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)', fontWeight: 500 }
-                    : { backgroundColor: 'var(--color-bg-elevated)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }
-                }
-              >
-                {roast.label}
-              </button>
-            ))}
-          </div>
-
           {/* Sort */}
           <div className="sm:ml-auto">
             <select
@@ -373,11 +349,10 @@ function ProductCard({ product, index, onViewDetails, onAddToCart }: {
   onViewDetails: () => void;
   onAddToCart: () => void;
 }) {
-  const isCoffee = ['single-origin', 'blend', 'decaf'].includes(product.category);
-  const roastLabel = product.roast ? { light: 'Light Roast', medium: 'Medium Roast', dark: 'Dark Roast' }[product.roast] : null;
-  const roastColor = product.roast ? { light: 'bg-amber-100 text-amber-800', medium: 'bg-orange-100 text-orange-800', dark: 'bg-stone-200 text-stone-800' }[product.roast] : null;
-
   const categoryLabel: Record<string, string> = {
+    'single-origin': '☕ Single Origin',
+    'blend': '☕ Blend',
+    'decaf': '☕ Decaf',
     sandwich: '🥪 Sandwich',
     pastry: '🥐 Pastry',
     beverage: '🥤 Beverage',
@@ -397,16 +372,9 @@ function ProductCard({ product, index, onViewDetails, onAddToCart }: {
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
         />
         <div className="absolute top-3 left-3 flex gap-1.5">
-          {isCoffee && roastLabel && (
-            <span className="px-2.5 py-1 rounded-full text-xs font-medium backdrop-blur-sm" style={{ backgroundColor: 'rgba(255,255,255,0.9)', color: 'var(--color-text)' }}>
-              {roastLabel}
-            </span>
-          )}
-          {!isCoffee && (
-            <span className="px-2.5 py-1 rounded-full text-xs font-medium backdrop-blur-sm" style={{ backgroundColor: 'rgba(255,255,255,0.9)', color: 'var(--color-text)' }}>
-              {categoryLabel[product.category] || product.category}
-            </span>
-          )}
+          <span className="px-2.5 py-1 rounded-full text-xs font-medium backdrop-blur-sm" style={{ backgroundColor: 'rgba(255,255,255,0.9)', color: 'var(--color-text)' }}>
+            {categoryLabel[product.category] || product.category}
+          </span>
         </div>
         <div className="absolute top-3 right-3 flex gap-1.5">
           {product.isVeg !== undefined && (
@@ -531,13 +499,7 @@ function ProductDetailModal({ product, onClose, onAddToCart }: {
           <p className="leading-relaxed mb-6" style={{ color: 'var(--color-text-muted)' }}>{product.description}</p>
 
           {/* Details */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            {product.roast && (
-              <div className="rounded-xl p-3 text-center" style={{ backgroundColor: 'var(--color-bg-soft)' }}>
-                <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-faint)' }}>Roast</p>
-                <p className="font-semibold capitalize mt-1" style={{ color: 'var(--color-text)' }}>{product.roast}</p>
-              </div>
-            )}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
             {product.weight && (
               <div className="rounded-xl p-3 text-center" style={{ backgroundColor: 'var(--color-bg-soft)' }}>
                 <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--color-text-faint)' }}>Size</p>
