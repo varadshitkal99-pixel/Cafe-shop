@@ -1,1 +1,68 @@
 @import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-cream: #faf6f1;
+    --color-warm-white: #fefcf9;
+    --color-espresso: #2c1810;
+    --color-mocha: #5c3d2e;
+    --color-caramel: #c4883a;
+    --color-latte: #d4a574;
+    --color-sage: #8b9e82;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background-color: var(--color-cream);
+    color: var(--color-espresso);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-latte) transparent;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-[#5c3d2e] text-[#faf6f1] px-6 py-3 rounded-lg font-medium
+           hover:bg-[#3d2518] transition-all duration-300 ease-out
+           shadow-md hover:shadow-lg active:scale-[0.98];
+  }
+
+  .btn-secondary {
+    @apply border-2 border-[#5c3d2e] text-[#5c3d2e] px-6 py-3 rounded-lg font-medium
+           hover:bg-[#5c3d2e] hover:text-[#faf6f1] transition-all duration-300 ease-out;
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl;
+  }
+
+  .fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+
+  .slide-up {
+    animation: slideUp 0.4s ease-out forwards;
+  }
+
+  .slide-in-right {
+    animation: slideInRight 0.3s ease-out forwards;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
