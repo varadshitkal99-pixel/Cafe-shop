@@ -1,512 +1,401 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
+import { useProducts, useCart, useOrders, useDebounce } from './hooks/useBackend';
+import type { Product, SearchFilters, CustomerInfo } from './backend';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface Product {
-  id: number;
-  name: string;
-  origin: string;
-  category: string;
-  price: number;
-  weight: string;
-  roast: string;
-  description: string;
-  notes: string[];
-  emoji: string;
-  rating: number;
-}
-
-interface CartItem {
-  product: Product;
-  quantity: number;
-}
-
-// ─── Data ────────────────────────────────────────────────────────────────────
-
-const products: Product[] = [
-  {
-    id: 1,
-    name: 'Ethiopian Yirgacheffe',
-    origin: 'Ethiopia',
-    category: 'Single Origin',
-    price: 24.99,
-    weight: '340g',
-    roast: 'Light',
-    description: 'A bright and complex coffee from the birthplace of arabica. Grown at elevations above 1,800m in the Yirgacheffe region, this lot showcases the terroir of its origin with remarkable clarity.',
-    notes: ['Blueberry', 'Jasmine', 'Bergamot', 'Honey'],
-    emoji: '🫐',
-    rating: 4.9,
-  },
-  {
-    id: 2,
-    name: 'Colombian Supremo',
-    origin: 'Colombia',
-    category: 'Single Origin',
-    price: 21.99,
-    weight: '340g',
-    roast: 'Medium',
-    description: 'Sourced from small farms in the Huila region, this Supremo grade coffee delivers a perfectly balanced cup with sweet caramel undertones and a velvety body.',
-    notes: ['Caramel', 'Red Apple', 'Cocoa', 'Walnut'],
-    emoji: '🍎',
-    rating: 4.7,
-  },
-  {
-    id: 3,
-    name: 'Midnight Velvet Blend',
-    origin: 'Brazil & Guatemala',
-    category: 'Blend',
-    price: 19.99,
-    weight: '340g',
-    roast: 'Dark',
-    description: 'Our signature dark roast blend combines Brazilian naturals with Guatemalan highland beans. Rich, full-bodied, and perfect for espresso or French press.',
-    notes: ['Dark Chocolate', 'Smoky Oak', 'Molasses', 'Dried Fig'],
-    emoji: '🍫',
-    rating: 4.6,
-  },
-  {
-    id: 4,
-    name: 'Kenyan AA Peaberry',
-    origin: 'Kenya',
-    category: 'Single Origin',
-    price: 28.99,
-    weight: '250g',
-    roast: 'Light-Medium',
-    description: 'Rare peaberry selection from the Nyeri highlands. Each bean is a single round seed, concentrating the intense fruit-forward flavors unique to Kenyan coffee.',
-    notes: ['Blackcurrant', 'Grapefruit', 'Tomato', 'Brown Sugar'],
-    emoji: '🍇',
-    rating: 4.8,
-  },
-  {
-    id: 5,
-    name: 'Morning Ritual Blend',
-    origin: 'Ethiopia & Colombia',
-    category: 'Blend',
-    price: 17.99,
-    weight: '340g',
-    roast: 'Medium',
-    description: 'A smooth, approachable blend designed for your daily ritual. Combines the fruitiness of washed Ethiopian with the sweetness of Colombian for a crowd-pleasing cup.',
-    notes: ['Milk Chocolate', 'Toasted Almond', 'Orange Zest', 'Vanilla'],
-    emoji: '☀️',
-    rating: 4.5,
-  },
-  {
-    id: 6,
-    name: 'Sumatra Mandheling',
-    origin: 'Indonesia',
-    category: 'Single Origin',
-    price: 23.99,
-    weight: '340g',
-    roast: 'Dark',
-    description: 'Wet-hulled in the traditional Giling Basah method, this Sumatran coffee offers an earthy, full-bodied experience with low acidity and deep, complex flavors.',
-    notes: ['Cedar', 'Dark Cocoa', 'Tobacco', 'Earthy Spice'],
-    emoji: '🌿',
-    rating: 4.4,
-  },
-];
-
-const categories = ['All', 'Single Origin', 'Blend'];
-const roastLevels = ['All', 'Light', 'Light-Medium', 'Medium', 'Dark'];
-
-// ─── App Component ───────────────────────────────────────────────────────────
-
+// ====================
+// APP COMPONENT
+// ====================
 export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [activeRoast, setActiveRoast] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('rating');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isCheckout, setIsCheckout] = useState(false);
-  const [checkoutComplete, setCheckoutComplete] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showCart, setShowCart] = useState(false);
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [showOrderSuccess, setShowOrderSuccess] = useState(false);
+  const [notification, setNotification] = useState<string | null>(null);
 
-  // Filter products
-  const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
-      const matchesSearch =
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.notes.some((note) =>
-          note.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-      const matchesCategory =
-        selectedCategory === 'All' || product.category === selectedCategory;
-      return matchesSearch && matchesCategory;
-    });
-  }, [searchQuery, selectedCategory]);
+  const debouncedSearch = useDebounce(searchQuery, 300);
 
-  // Cart operations
-  const addToCart = useCallback((product: Product) => {
-    setCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [...prev, { product, quantity: 1 }];
-    });
-  }, []);
+  const filters: SearchFilters = useMemo(() => ({
+    query: debouncedSearch || undefined,
+    category: activeCategory !== 'all' ? activeCategory : undefined,
+    roast: activeRoast !== 'all' ? activeRoast : undefined,
+    sortBy: sortBy as SearchFilters['sortBy'],
+  }), [debouncedSearch, activeCategory, activeRoast, sortBy]);
 
-  const updateQuantity = useCallback((productId: number, delta: number) => {
-    setCart((prev) => {
-      return prev
-        .map((item) =>
-          item.product.id === productId
-            ? { ...item, quantity: Math.max(0, item.quantity + delta) }
-            : item
-        )
-        .filter((item) => item.quantity > 0);
-    });
-  }, []);
+  const { products, loading } = useProducts(filters);
+  const { items: cartItems, total: cartTotal, count: cartCount, addItem, updateQuantity, removeItem, clearCart } = useCart();
+  const { submitting, lastOrder, createOrder, setLastOrder } = useOrders();
 
-  const removeFromCart = useCallback((productId: number) => {
-    setCart((prev) => prev.filter((item) => item.product.id !== productId));
-  }, []);
-
-  const cartTotal = useMemo(
-    () => cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
-    [cart]
-  );
-
-  const cartCount = useMemo(
-    () => cart.reduce((sum, item) => sum + item.quantity, 0),
-    [cart]
-  );
-
-  const handleCheckout = () => {
-    setIsCheckout(true);
+  const showNotification = (msg: string) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(null), 2500);
   };
 
-  const completeCheckout = () => {
-    setCheckoutComplete(true);
-    setCart([]);
-    setTimeout(() => {
-      setIsCheckout(false);
-      setIsCartOpen(false);
-      setCheckoutComplete(false);
-    }, 3000);
+  const handleAddToCart = async (product: Product) => {
+    await addItem(product);
+    showNotification(`${product.name} added to cart`);
+  };
+
+  const handleCheckout = async (customer: CustomerInfo) => {
+    const response = await createOrder(customer);
+    if (response.success) {
+      setShowCheckout(false);
+      setShowCart(false);
+      setShowOrderSuccess(true);
+    }
+  };
+
+  const handleDismissOrder = () => {
+    setShowOrderSuccess(false);
+    setLastOrder(null);
   };
 
   return (
-    <div className="min-h-screen bg-[#faf6f1]">
+    <div className="min-h-screen bg-[#faf6f1] text-[#2c1810]">
+      {/* Notification Toast */}
+      {notification && (
+        <div className="fixed top-4 right-4 z-[100] fade-in">
+          <div className="bg-[#2c1810] text-[#faf6f1] px-5 py-3 rounded-lg shadow-lg flex items-center gap-2">
+            <svg className="w-5 h-5 text-[#c4883a]" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+            <span className="text-sm font-medium">{notification}</span>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-[#faf6f1]/95 backdrop-blur-md border-b border-[#d4a574]/20">
+      <header className="sticky top-0 z-50 bg-[#faf6f1]/95 backdrop-blur-md border-b border-[#d4a574]/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 sm:h-20">
             {/* Logo */}
             <div className="flex items-center gap-2">
-              <span className="text-2xl sm:text-3xl">☕</span>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#5c3d2e] rounded-full flex items-center justify-center">
+                <span className="text-[#c4883a] text-lg sm:text-xl">☕</span>
+              </div>
               <div>
-                <h1 className="text-lg sm:text-xl font-bold text-[#2c1810] tracking-tight leading-none">
-                  Ember & Brew
-                </h1>
-                <p className="text-[10px] sm:text-xs text-[#5c3d2e]/60 tracking-widest uppercase">
-                  Specialty Coffee
-                </p>
+                <h1 className="text-lg sm:text-xl font-bold text-[#2c1810] tracking-tight">Ember & Brew</h1>
+                <p className="text-[10px] sm:text-xs text-[#5c3d2e]/60 tracking-widest uppercase">Specialty Coffee</p>
               </div>
             </div>
 
-            {/* Desktop Nav */}
-            <nav className="hidden md:flex items-center gap-8">
-              <a href="#shop" className="text-sm font-medium text-[#5c3d2e] hover:text-[#c4883a] transition-colors">
-                Shop
-              </a>
-              <a href="#about" className="text-sm font-medium text-[#5c3d2e] hover:text-[#c4883a] transition-colors">
-                Our Story
-              </a>
-              <a href="#brew" className="text-sm font-medium text-[#5c3d2e] hover:text-[#c4883a] transition-colors">
-                Brewing Guide
-              </a>
-            </nav>
+            {/* Search Bar */}
+            <div className="hidden md:flex flex-1 max-w-md mx-8">
+              <div className="relative w-full">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5c3d2e]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search coffees, origins, flavors..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#d4a574]/30 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-[#c4883a]/40 focus:border-[#c4883a] transition-all"
+                />
+              </div>
+            </div>
 
             {/* Cart Button */}
             <button
-              onClick={() => setIsCartOpen(true)}
-              className="relative p-2 sm:p-3 rounded-full hover:bg-[#d4a574]/10 transition-colors"
+              onClick={() => setShowCart(true)}
+              className="relative p-2.5 sm:p-3 bg-[#5c3d2e] text-[#faf6f1] rounded-full hover:bg-[#3d2518] transition-all active:scale-95"
             >
-              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-[#2c1810]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
               {cartCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-[#c4883a] text-white text-xs rounded-full flex items-center justify-center font-medium">
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#c4883a] text-[#2c1810] text-xs font-bold rounded-full flex items-center justify-center">
                   {cartCount}
                 </span>
               )}
             </button>
           </div>
-        </div>
-      </header>
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20 lg:py-28">
-          <div className="max-w-2xl">
-            <p className="text-[#c4883a] font-medium tracking-widest uppercase text-xs sm:text-sm mb-3 sm:mb-4">
-              Freshly Roasted • Small Batch
-            </p>
-            <h2 className="text-3xl sm:text-4xl lg:text-6xl font-bold text-[#2c1810] leading-tight mb-4 sm:mb-6">
-              Coffee that tells a{' '}
-              <span className="text-[#c4883a]">story</span>
-            </h2>
-            <p className="text-base sm:text-lg text-[#5c3d2e]/70 leading-relaxed mb-6 sm:mb-8 max-w-lg">
-              From farm to cup, we source the world's finest beans and roast them 
-              with care. Each bag is a journey to the origins of exceptional coffee.
-            </p>
-            <a
-              href="#shop"
-              className="inline-flex items-center gap-2 btn-primary"
-            >
-              Explore Our Coffees
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-              </svg>
-            </a>
-          </div>
-        </div>
-        {/* Decorative elements */}
-        <div className="absolute top-10 right-10 text-6xl sm:text-8xl opacity-10 hidden sm:block">☕</div>
-        <div className="absolute bottom-10 right-1/4 text-4xl opacity-5 hidden lg:block">🌿</div>
-      </section>
-
-      {/* Shop Section */}
-      <section id="shop" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
-        {/* Search & Filters */}
-        <div className="mb-8 sm:mb-12">
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-6">
-            <h3 className="text-2xl sm:text-3xl font-bold text-[#2c1810]">
-              Our Selection
-            </h3>
-            {/* Search */}
-            <div className="relative w-full sm:w-72">
+          {/* Mobile Search */}
+          <div className="md:hidden pb-3">
+            <div className="relative">
               <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5c3d2e]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
                 type="text"
-                placeholder="Search coffees, origins, notes..."
+                placeholder="Search coffees..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#d4a574]/30 rounded-xl text-sm text-[#2c1810] placeholder:text-[#5c3d2e]/40 focus:outline-none focus:ring-2 focus:ring-[#c4883a]/30 focus:border-[#c4883a] transition-all"
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#d4a574]/30 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-[#c4883a]/40 focus:border-[#c4883a] transition-all"
               />
             </div>
           </div>
+        </div>
+      </header>
 
+      {/* Hero Section */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-[#2c1810] via-[#3d2518] to-[#5c3d2e] text-[#faf6f1]">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-10 left-10 w-32 h-32 rounded-full bg-[#c4883a] blur-3xl"></div>
+          <div className="absolute bottom-10 right-10 w-48 h-48 rounded-full bg-[#d4a574] blur-3xl"></div>
+        </div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
+          <div className="max-w-2xl">
+            <p className="text-[#c4883a] text-sm font-medium tracking-widest uppercase mb-3">Est. 2024</p>
+            <h2 className="text-3xl sm:text-5xl font-bold leading-tight mb-4">
+              Exceptional Coffee,<br />
+              <span className="text-[#c4883a]">Thoughtfully Sourced</span>
+            </h2>
+            <p className="text-[#faf6f1]/70 text-base sm:text-lg leading-relaxed max-w-lg">
+              From single-origin estates to artisanal blends, every bean is selected for its unique character and roasted to perfection.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-8">
           {/* Category Filters */}
           <div className="flex flex-wrap gap-2">
-            {categories.map((category) => (
+            {[
+              { value: 'all', label: 'All' },
+              { value: 'single-origin', label: 'Single Origin' },
+              { value: 'blend', label: 'Blends' },
+            ].map((cat) => (
               <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                  selectedCategory === category
+                key={cat.value}
+                onClick={() => setActiveCategory(cat.value)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  activeCategory === cat.value
                     ? 'bg-[#5c3d2e] text-[#faf6f1] shadow-md'
-                    : 'bg-white text-[#5c3d2e] border border-[#d4a574]/30 hover:border-[#c4883a] hover:text-[#c4883a]'
+                    : 'bg-white text-[#5c3d2e] border border-[#d4a574]/30 hover:border-[#5c3d2e]'
                 }`}
               >
-                {category}
+                {cat.label}
               </button>
             ))}
           </div>
+
+          {/* Roast Filters */}
+          <div className="flex flex-wrap gap-2">
+            {[
+              { value: 'all', label: 'Any Roast' },
+              { value: 'light', label: '☀️ Light' },
+              { value: 'medium', label: '🌤️ Medium' },
+              { value: 'dark', label: '🌙 Dark' },
+            ].map((roast) => (
+              <button
+                key={roast.value}
+                onClick={() => setActiveRoast(roast.value)}
+                className={`px-3 py-2 rounded-full text-sm transition-all ${
+                  activeRoast === roast.value
+                    ? 'bg-[#c4883a] text-[#2c1810] shadow-md font-medium'
+                    : 'bg-white text-[#5c3d2e] border border-[#d4a574]/30 hover:border-[#c4883a]'
+                }`}
+              >
+                {roast.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort */}
+          <div className="sm:ml-auto">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-4 py-2 bg-white border border-[#d4a574]/30 rounded-lg text-sm text-[#5c3d2e] focus:outline-none focus:ring-2 focus:ring-[#c4883a]/40"
+            >
+              <option value="rating">Top Rated</option>
+              <option value="price-asc">Price: Low → High</option>
+              <option value="price-desc">Price: High → Low</option>
+              <option value="name">Name A-Z</option>
+            </select>
+          </div>
         </div>
 
-        {/* Product Grid */}
-        {filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            {filteredProducts.map((product, index) => (
+        {/* Products Grid */}
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse">
+                <div className="h-56 bg-[#d4a574]/20"></div>
+                <div className="p-5 space-y-3">
+                  <div className="h-4 bg-[#d4a574]/20 rounded w-3/4"></div>
+                  <div className="h-3 bg-[#d4a574]/20 rounded w-1/2"></div>
+                  <div className="h-8 bg-[#d4a574]/20 rounded w-1/3"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : products.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="text-5xl mb-4">🔍</div>
+            <h3 className="text-xl font-semibold text-[#5c3d2e] mb-2">No coffees found</h3>
+            <p className="text-[#5c3d2e]/60">Try adjusting your filters or search terms</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {products.map((product, index) => (
               <ProductCard
                 key={product.id}
                 product={product}
                 index={index}
-                onViewDetails={setSelectedProduct}
-                onAddToCart={addToCart}
+                onViewDetails={() => setSelectedProduct(product)}
+                onAddToCart={() => handleAddToCart(product)}
               />
             ))}
           </div>
-        ) : (
-          <div className="text-center py-16">
-            <span className="text-5xl mb-4 block">🔍</span>
-            <p className="text-[#5c3d2e]/60 text-lg">No coffees match your search.</p>
-            <button
-              onClick={() => { setSearchQuery(''); setSelectedCategory('All'); }}
-              className="mt-4 text-[#c4883a] font-medium hover:underline"
-            >
-              Clear filters
-            </button>
-          </div>
         )}
-      </section>
-
-      {/* About Section */}
-      <section id="about" className="bg-[#2c1810] text-[#faf6f1]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div>
-              <p className="text-[#c4883a] font-medium tracking-widest uppercase text-xs sm:text-sm mb-3">
-                Our Philosophy
-              </p>
-              <h3 className="text-2xl sm:text-4xl font-bold mb-6 leading-tight">
-                Every bean has a journey
-              </h3>
-              <p className="text-[#faf6f1]/70 leading-relaxed mb-4">
-                We travel to origin, building relationships with farmers who share our 
-                passion for quality. From the volcanic soils of Ethiopia to the misty 
-                highlands of Colombia, we select only the top 2% of the world's coffee.
-              </p>
-              <p className="text-[#faf6f1]/70 leading-relaxed">
-                Each batch is roasted in small quantities at our workshop, ensuring 
-                peak freshness and allowing the unique character of each coffee to shine.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-[#5c3d2e]/50 rounded-2xl p-6 text-center">
-                <span className="text-3xl mb-2 block">🌍</span>
-                <p className="text-2xl font-bold text-[#c4883a]">12</p>
-                <p className="text-sm text-[#faf6f1]/60">Countries</p>
-              </div>
-              <div className="bg-[#5c3d2e]/50 rounded-2xl p-6 text-center">
-                <span className="text-3xl mb-2 block">👨‍🌾</span>
-                <p className="text-2xl font-bold text-[#c4883a]">48</p>
-                <p className="text-sm text-[#faf6f1]/60">Farm Partners</p>
-              </div>
-              <div className="bg-[#5c3d2e]/50 rounded-2xl p-6 text-center">
-                <span className="text-3xl mb-2 block">🏆</span>
-                <p className="text-2xl font-bold text-[#c4883a]">86+</p>
-                <p className="text-sm text-[#faf6f1]/60">Cup Score</p>
-              </div>
-              <div className="bg-[#5c3d2e]/50 rounded-2xl p-6 text-center">
-                <span className="text-3xl mb-2 block">📦</span>
-                <p className="text-2xl font-bold text-[#c4883a]">24h</p>
-                <p className="text-sm text-[#faf6f1]/60">Roast to Ship</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      </main>
 
       {/* Footer */}
-      <footer className="bg-[#2c1810] border-t border-[#5c3d2e]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">☕</span>
-              <span className="font-bold text-[#faf6f1]">Ember & Brew</span>
+      <footer className="bg-[#2c1810] text-[#faf6f1]/70 mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-2xl">☕</span>
+                <span className="text-lg font-bold text-[#faf6f1]">Ember & Brew</span>
+              </div>
+              <p className="text-sm leading-relaxed">
+                Specialty coffee roasted with care. Every cup tells a story of origin, craft, and community.
+              </p>
             </div>
-            <p className="text-sm text-[#faf6f1]/40">
-              © 2026 Ember & Brew. Crafted with care.
-            </p>
+            <div>
+              <h4 className="font-semibold text-[#faf6f1] mb-3">Quick Links</h4>
+              <ul className="space-y-2 text-sm">
+                <li><button className="hover:text-[#c4883a] transition-colors">Our Story</button></li>
+                <li><button className="hover:text-[#c4883a] transition-colors">Subscriptions</button></li>
+                <li><button className="hover:text-[#c4883a] transition-colors">Brewing Guides</button></li>
+                <li><button className="hover:text-[#c4883a] transition-colors">Wholesale</button></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold text-[#faf6f1] mb-3">Connect</h4>
+              <ul className="space-y-2 text-sm">
+                <li><button className="hover:text-[#c4883a] transition-colors">Instagram</button></li>
+                <li><button className="hover:text-[#c4883a] transition-colors">Twitter</button></li>
+                <li><button className="hover:text-[#c4883a] transition-colors">Newsletter</button></li>
+              </ul>
+            </div>
+          </div>
+          <div className="border-t border-[#faf6f1]/10 mt-8 pt-8 text-center text-xs">
+            <p>© 2024 Ember & Brew. All rights reserved. Backend-powered e-commerce.</p>
           </div>
         </div>
       </footer>
 
       {/* Product Detail Modal */}
       {selectedProduct && (
-        <ProductModal
+        <ProductDetailModal
           product={selectedProduct}
           onClose={() => setSelectedProduct(null)}
-          onAddToCart={(product) => {
-            addToCart(product);
-            setSelectedProduct(null);
-          }}
+          onAddToCart={() => handleAddToCart(selectedProduct)}
         />
       )}
 
       {/* Cart Sidebar */}
-      {isCartOpen && (
+      {showCart && (
         <CartSidebar
-          cart={cart}
-          cartTotal={cartTotal}
-          isCheckout={isCheckout}
-          checkoutComplete={checkoutComplete}
-          onClose={() => { setIsCartOpen(false); setIsCheckout(false); }}
+          items={cartItems}
+          total={cartTotal}
+          onClose={() => setShowCart(false)}
           onUpdateQuantity={updateQuantity}
-          onRemove={removeFromCart}
-          onCheckout={handleCheckout}
-          onCompleteCheckout={completeCheckout}
+          onRemoveItem={removeItem}
+          onCheckout={() => { setShowCart(false); setShowCheckout(true); }}
+        />
+      )}
+
+      {/* Checkout Modal */}
+      {showCheckout && (
+        <CheckoutModal
+          items={cartItems}
+          total={cartTotal}
+          submitting={submitting}
+          onClose={() => setShowCheckout(false)}
+          onSubmit={handleCheckout}
+        />
+      )}
+
+      {/* Order Success Modal */}
+      {showOrderSuccess && lastOrder && (
+        <OrderSuccessModal
+          order={lastOrder}
+          onDismiss={handleDismissOrder}
         />
       )}
     </div>
   );
 }
 
-// ─── Product Card Component ──────────────────────────────────────────────────
-
-function ProductCard({
-  product,
-  index,
-  onViewDetails,
-  onAddToCart,
-}: {
+// ====================
+// PRODUCT CARD
+// ====================
+function ProductCard({ product, index, onViewDetails, onAddToCart }: {
   product: Product;
   index: number;
-  onViewDetails: (product: Product) => void;
-  onAddToCart: (product: Product) => void;
+  onViewDetails: () => void;
+  onAddToCart: () => void;
 }) {
+  const roastLabel = { light: 'Light Roast', medium: 'Medium Roast', dark: 'Dark Roast' }[product.roast];
+  const roastColor = { light: 'bg-amber-100 text-amber-800', medium: 'bg-orange-100 text-orange-800', dark: 'bg-stone-200 text-stone-800' }[product.roast];
+
   return (
     <div
-      className="bg-white rounded-2xl overflow-hidden border border-[#d4a574]/10 card-hover slide-up group"
+      className="bg-white rounded-2xl overflow-hidden card-hover shadow-sm border border-[#d4a574]/10 slide-up"
       style={{ animationDelay: `${index * 80}ms` }}
     >
-      {/* Product Image Area */}
-      <div
-        className="relative h-48 sm:h-56 bg-gradient-to-br from-[#d4a574]/20 to-[#c4883a]/10 flex items-center justify-center cursor-pointer"
-        onClick={() => onViewDetails(product)}
-      >
-        <span className="text-6xl sm:text-7xl group-hover:scale-110 transition-transform duration-300">
-          {product.emoji}
-        </span>
-        {/* Roast badge */}
-        <span className="absolute top-3 right-3 px-2.5 py-1 bg-white/90 backdrop-blur-sm rounded-full text-xs font-medium text-[#5c3d2e]">
-          {product.roast} Roast
-        </span>
-        {/* Category badge */}
-        <span className="absolute top-3 left-3 px-2.5 py-1 bg-[#5c3d2e]/90 backdrop-blur-sm rounded-full text-xs font-medium text-[#faf6f1]">
-          {product.category}
-        </span>
+      {/* Image */}
+      <div className="relative h-56 overflow-hidden cursor-pointer group" onClick={onViewDetails}>
+        <img
+          src={product.image}
+          alt={product.name}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+        />
+        <div className="absolute top-3 left-3">
+          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${roastColor}`}>
+            {roastLabel}
+          </span>
+        </div>
+        <div className="absolute top-3 right-3">
+          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-white/90 text-[#5c3d2e] backdrop-blur-sm">
+            {product.weight}
+          </span>
+        </div>
       </div>
 
       {/* Content */}
-      <div className="p-5 sm:p-6">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <h4 className="font-bold text-[#2c1810] text-base sm:text-lg leading-tight">
-            {product.name}
-          </h4>
-          <div className="flex items-center gap-0.5 shrink-0">
-            <svg className="w-3.5 h-3.5 text-[#c4883a]" fill="currentColor" viewBox="0 0 20 20">
-              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-            </svg>
-            <span className="text-xs font-medium text-[#5c3d2e]">{product.rating}</span>
+      <div className="p-5">
+        <div className="flex items-start justify-between mb-2">
+          <div>
+            <h3 className="font-semibold text-[#2c1810] text-lg leading-tight">{product.name}</h3>
+            <p className="text-sm text-[#5c3d2e]/60 mt-0.5">{product.origin}</p>
+          </div>
+          <div className="flex items-center gap-1 text-sm">
+            <span className="text-[#c4883a]">★</span>
+            <span className="font-medium">{product.rating}</span>
           </div>
         </div>
 
-        <p className="text-sm text-[#5c3d2e]/60 mb-3">
-          {product.origin} • {product.weight}
-        </p>
-
-        {/* Tasting Notes */}
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {product.notes.slice(0, 3).map((note) => (
-            <span
-              key={note}
-              className="px-2 py-0.5 bg-[#faf6f1] text-[#5c3d2e]/70 text-xs rounded-md border border-[#d4a574]/20"
-            >
+        {/* Flavor Notes */}
+        <div className="flex flex-wrap gap-1.5 mt-3 mb-4">
+          {product.flavorNotes.map((note) => (
+            <span key={note} className="px-2 py-0.5 bg-[#faf6f1] text-[#5c3d2e]/70 text-xs rounded-full border border-[#d4a574]/20">
               {note}
             </span>
           ))}
         </div>
 
         {/* Price & Actions */}
-        <div className="flex items-center justify-between pt-3 border-t border-[#d4a574]/10">
-          <span className="text-xl font-bold text-[#2c1810]">
-            ${product.price.toFixed(2)}
-          </span>
+        <div className="flex items-center justify-between mt-auto pt-3 border-t border-[#d4a574]/10">
+          <span className="text-xl font-bold text-[#2c1810]">${product.price.toFixed(2)}</span>
           <button
-            onClick={() => onAddToCart(product)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[#5c3d2e] text-[#faf6f1] rounded-lg text-sm font-medium hover:bg-[#3d2518] transition-colors active:scale-95"
+            onClick={onAddToCart}
+            className="flex items-center gap-1.5 px-4 py-2 bg-[#5c3d2e] text-[#faf6f1] rounded-lg text-sm font-medium hover:bg-[#3d2518] transition-all active:scale-95"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
             Add
           </button>
@@ -516,110 +405,118 @@ function ProductCard({
   );
 }
 
-// ─── Product Modal Component ─────────────────────────────────────────────────
-
-function ProductModal({
-  product,
-  onClose,
-  onAddToCart,
-}: {
+// ====================
+// PRODUCT DETAIL MODAL
+// ====================
+function ProductDetailModal({ product, onClose, onAddToCart }: {
   product: Product;
   onClose: () => void;
-  onAddToCart: (product: Product) => void;
+  onAddToCart: () => void;
 }) {
+  const [quantity, setQuantity] = useState(1);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 fade-in" onClick={onClose}>
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-[#2c1810]/60 backdrop-blur-sm" />
-
-      {/* Modal */}
+      <div className="absolute inset-0 bg-[#2c1810]/60 backdrop-blur-sm"></div>
       <div
-        className="relative bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl slide-up"
+        className="relative bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl slide-up"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close button */}
+        {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 hover:bg-white shadow-md transition-colors"
+          className="absolute top-4 right-4 z-10 w-8 h-8 bg-white/80 backdrop-blur rounded-full flex items-center justify-center hover:bg-white transition-all shadow-md"
         >
-          <svg className="w-4 h-4 text-[#2c1810]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
 
-        {/* Image area */}
-        <div className="h-56 sm:h-64 bg-gradient-to-br from-[#d4a574]/20 to-[#c4883a]/10 flex items-center justify-center rounded-t-3xl">
-          <span className="text-8xl">{product.emoji}</span>
+        {/* Image */}
+        <div className="h-64 sm:h-80 overflow-hidden rounded-t-2xl">
+          <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
         </div>
 
         {/* Content */}
         <div className="p-6 sm:p-8">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="px-2.5 py-0.5 bg-[#5c3d2e]/10 text-[#5c3d2e] text-xs font-medium rounded-full">
-              {product.category}
-            </span>
-            <span className="px-2.5 py-0.5 bg-[#c4883a]/10 text-[#c4883a] text-xs font-medium rounded-full">
-              {product.roast} Roast
-            </span>
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-[#2c1810]">{product.name}</h2>
+              <p className="text-[#5c3d2e]/60 mt-1">{product.origin}</p>
+            </div>
+            <div className="flex items-center gap-1 bg-[#faf6f1] px-3 py-1.5 rounded-full">
+              <span className="text-[#c4883a]">★</span>
+              <span className="font-medium text-sm">{product.rating}</span>
+              <span className="text-[#5c3d2e]/40 text-xs">({product.reviewCount})</span>
+            </div>
           </div>
 
-          <h3 className="text-2xl sm:text-3xl font-bold text-[#2c1810] mb-1">
-            {product.name}
-          </h3>
-          <p className="text-[#5c3d2e]/60 mb-4">
-            {product.origin} • {product.weight}
-          </p>
+          <p className="text-[#5c3d2e]/80 leading-relaxed mb-6">{product.description}</p>
 
-          {/* Rating */}
-          <div className="flex items-center gap-1 mb-4">
-            {[...Array(5)].map((_, i) => (
-              <svg
-                key={i}
-                className={`w-4 h-4 ${i < Math.floor(product.rating) ? 'text-[#c4883a]' : 'text-[#d4a574]/30'}`}
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-            ))}
-            <span className="text-sm font-medium text-[#5c3d2e] ml-1">{product.rating}</span>
+          {/* Details */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            <div className="bg-[#faf6f1] rounded-xl p-3 text-center">
+              <p className="text-xs text-[#5c3d2e]/50 uppercase tracking-wide">Roast</p>
+              <p className="font-semibold text-[#2c1810] capitalize mt-1">{product.roast}</p>
+            </div>
+            <div className="bg-[#faf6f1] rounded-xl p-3 text-center">
+              <p className="text-xs text-[#5c3d2e]/50 uppercase tracking-wide">Weight</p>
+              <p className="font-semibold text-[#2c1810] mt-1">{product.weight}</p>
+            </div>
+            <div className="bg-[#faf6f1] rounded-xl p-3 text-center">
+              <p className="text-xs text-[#5c3d2e]/50 uppercase tracking-wide">Category</p>
+              <p className="font-semibold text-[#2c1810] capitalize mt-1">{product.category.replace('-', ' ')}</p>
+            </div>
+            <div className="bg-[#faf6f1] rounded-xl p-3 text-center">
+              <p className="text-xs text-[#5c3d2e]/50 uppercase tracking-wide">Status</p>
+              <p className="font-semibold text-[#8b9e82] mt-1">In Stock</p>
+            </div>
           </div>
 
-          <p className="text-[#5c3d2e]/80 leading-relaxed mb-6">
-            {product.description}
-          </p>
-
-          {/* Tasting Notes */}
+          {/* Flavor Notes */}
           <div className="mb-6">
-            <h4 className="text-sm font-semibold text-[#2c1810] uppercase tracking-wider mb-2">
-              Tasting Notes
-            </h4>
+            <h4 className="text-sm font-semibold text-[#5c3d2e] uppercase tracking-wide mb-2">Flavor Notes</h4>
             <div className="flex flex-wrap gap-2">
-              {product.notes.map((note) => (
-                <span
-                  key={note}
-                  className="px-3 py-1.5 bg-[#faf6f1] text-[#5c3d2e] text-sm rounded-lg border border-[#d4a574]/20"
-                >
+              {product.flavorNotes.map((note) => (
+                <span key={note} className="px-3 py-1.5 bg-[#c4883a]/10 text-[#5c3d2e] text-sm rounded-full border border-[#c4883a]/20">
                   {note}
                 </span>
               ))}
             </div>
           </div>
 
-          {/* Price & Add to Cart */}
-          <div className="flex items-center justify-between pt-4 border-t border-[#d4a574]/10">
-            <div>
-              <p className="text-sm text-[#5c3d2e]/60">Price</p>
-              <p className="text-2xl font-bold text-[#2c1810]">${product.price.toFixed(2)}</p>
+          {/* Add to Cart */}
+          <div className="flex items-center gap-4 pt-4 border-t border-[#d4a574]/20">
+            <div className="flex items-center border border-[#d4a574]/30 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                className="px-3 py-2.5 hover:bg-[#faf6f1] transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                </svg>
+              </button>
+              <span className="px-4 py-2.5 font-medium text-[#2c1810] min-w-[3rem] text-center">{quantity}</span>
+              <button
+                onClick={() => setQuantity(quantity + 1)}
+                className="px-3 py-2.5 hover:bg-[#faf6f1] transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+              </button>
             </div>
             <button
-              onClick={() => onAddToCart(product)}
-              className="btn-primary flex items-center gap-2"
+              onClick={() => {
+                for (let i = 0; i < quantity; i++) onAddToCart();
+                onClose();
+              }}
+              className="flex-1 btn-primary flex items-center justify-center gap-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
-              Add to Cart
+              Add to Cart — ${(product.price * quantity).toFixed(2)}
             </button>
           </div>
         </div>
@@ -628,105 +525,99 @@ function ProductModal({
   );
 }
 
-// ─── Cart Sidebar Component ──────────────────────────────────────────────────
-
-function CartSidebar({
-  cart,
-  cartTotal,
-  isCheckout,
-  checkoutComplete,
-  onClose,
-  onUpdateQuantity,
-  onRemove,
-  onCheckout,
-  onCompleteCheckout,
-}: {
-  cart: CartItem[];
-  cartTotal: number;
-  isCheckout: boolean;
-  checkoutComplete: boolean;
+// ====================
+// CART SIDEBAR
+// ====================
+function CartSidebar({ items, total, onClose, onUpdateQuantity, onRemoveItem, onCheckout }: {
+  items: { product: Product; quantity: number }[];
+  total: number;
   onClose: () => void;
-  onUpdateQuantity: (productId: number, delta: number) => void;
-  onRemove: (productId: number) => void;
+  onUpdateQuantity: (productId: string, quantity: number) => void;
+  onRemoveItem: (productId: string) => void;
   onCheckout: () => void;
-  onCompleteCheckout: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-50 fade-in" onClick={onClose}>
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-[#2c1810]/50 backdrop-blur-sm" />
-
-      {/* Sidebar */}
+      <div className="absolute inset-0 bg-[#2c1810]/50 backdrop-blur-sm"></div>
       <div
-        className="absolute right-0 top-0 h-full w-full max-w-md bg-[#faf6f1] shadow-2xl slide-in-right flex flex-col"
+        className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-[#faf6f1] shadow-2xl slide-in-right flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-[#d4a574]/20">
-          <h3 className="text-xl font-bold text-[#2c1810]">
-            {isCheckout ? 'Checkout' : 'Your Cart'}
-          </h3>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[#d4a574]/10 transition-colors"
-          >
-            <svg className="w-5 h-5 text-[#2c1810]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex items-center justify-between p-5 border-b border-[#d4a574]/20">
+          <h2 className="text-xl font-bold text-[#2c1810]">Your Cart</h2>
+          <button onClick={onClose} className="p-2 hover:bg-[#d4a574]/10 rounded-full transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6">
-          {checkoutComplete ? (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <span className="text-6xl mb-4 block">🎉</span>
-              <h4 className="text-2xl font-bold text-[#2c1810] mb-2">Order Confirmed!</h4>
-              <p className="text-[#5c3d2e]/60">
-                Thank you for your order. Your coffee is being prepared with love.
-              </p>
-            </div>
-          ) : isCheckout ? (
-            <CheckoutForm cart={cart} cartTotal={cartTotal} onComplete={onCompleteCheckout} />
-          ) : cart.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center">
-              <span className="text-5xl mb-4 block">🛒</span>
-              <h4 className="text-lg font-semibold text-[#2c1810] mb-1">Your cart is empty</h4>
-              <p className="text-[#5c3d2e]/60 text-sm">
-                Discover our specialty coffees and add some to your cart.
-              </p>
+        {/* Items */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {items.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-5xl mb-4">🛒</div>
+              <p className="text-[#5c3d2e]/60">Your cart is empty</p>
+              <p className="text-sm text-[#5c3d2e]/40 mt-1">Add some delicious coffee!</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {cart.map((item) => (
-                <CartItemCard
-                  key={item.product.id}
-                  item={item}
-                  onUpdateQuantity={onUpdateQuantity}
-                  onRemove={onRemove}
+            items.map((item) => (
+              <div key={item.product.id} className="flex gap-4 bg-white rounded-xl p-3 shadow-sm">
+                <img
+                  src={item.product.image}
+                  alt={item.product.name}
+                  className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
                 />
-              ))}
-            </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-medium text-[#2c1810] text-sm truncate">{item.product.name}</h4>
+                  <p className="text-xs text-[#5c3d2e]/50 mt-0.5">{item.product.weight}</p>
+                  <p className="font-semibold text-[#2c1810] mt-1">${(item.product.price * item.quantity).toFixed(2)}</p>
+
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="flex items-center border border-[#d4a574]/30 rounded-md overflow-hidden">
+                      <button
+                        onClick={() => onUpdateQuantity(item.product.id, item.quantity - 1)}
+                        className="px-2 py-1 hover:bg-[#faf6f1] transition-colors text-sm"
+                      >
+                        −
+                      </button>
+                      <span className="px-2.5 py-1 text-sm font-medium">{item.quantity}</span>
+                      <button
+                        onClick={() => onUpdateQuantity(item.product.id, item.quantity + 1)}
+                        className="px-2 py-1 hover:bg-[#faf6f1] transition-colors text-sm"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => onRemoveItem(item.product.id)}
+                      className="ml-auto p-1.5 text-[#5c3d2e]/40 hover:text-red-500 hover:bg-red-50 rounded-md transition-all"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
           )}
         </div>
 
         {/* Footer */}
-        {!isCheckout && !checkoutComplete && cart.length > 0 && (
-          <div className="p-5 sm:p-6 border-t border-[#d4a574]/20 bg-white">
+        {items.length > 0 && (
+          <div className="p-5 border-t border-[#d4a574]/20 bg-white">
             <div className="flex items-center justify-between mb-4">
               <span className="text-[#5c3d2e]/60">Subtotal</span>
-              <span className="text-xl font-bold text-[#2c1810]">${cartTotal.toFixed(2)}</span>
+              <span className="text-xl font-bold text-[#2c1810]">${total.toFixed(2)}</span>
             </div>
-            <div className="flex items-center justify-between mb-4 text-sm">
-              <span className="text-[#5c3d2e]/60">Shipping</span>
-              <span className="text-[#8b9e82] font-medium">Free</span>
-            </div>
-            <div className="flex items-center justify-between mb-5 pt-3 border-t border-[#d4a574]/10">
-              <span className="font-semibold text-[#2c1810]">Total</span>
-              <span className="text-2xl font-bold text-[#2c1810]">${cartTotal.toFixed(2)}</span>
-            </div>
-            <button onClick={onCheckout} className="w-full btn-primary text-center">
+            <p className="text-xs text-[#5c3d2e]/40 mb-4">Shipping calculated at checkout</p>
+            <button onClick={onCheckout} className="w-full btn-primary flex items-center justify-center gap-2">
               Proceed to Checkout
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
             </button>
           </div>
         )}
@@ -735,220 +626,244 @@ function CartSidebar({
   );
 }
 
-// ─── Cart Item Card ──────────────────────────────────────────────────────────
-
-function CartItemCard({
-  item,
-  onUpdateQuantity,
-  onRemove,
-}: {
-  item: CartItem;
-  onUpdateQuantity: (productId: number, delta: number) => void;
-  onRemove: (productId: number) => void;
+// ====================
+// CHECKOUT MODAL
+// ====================
+function CheckoutModal({ items, total, submitting, onClose, onSubmit }: {
+  items: { product: Product; quantity: number }[];
+  total: number;
+  submitting: boolean;
+  onClose: () => void;
+  onSubmit: (customer: CustomerInfo) => void;
 }) {
+  const [form, setForm] = useState<CustomerInfo>({
+    name: '',
+    email: '',
+    address: '',
+    city: '',
+    zipCode: '',
+    phone: '',
+  });
+  const [errors, setErrors] = useState<Partial<CustomerInfo>>({});
+
+  const validate = (): boolean => {
+    const newErrors: Partial<CustomerInfo> = {};
+    if (!form.name.trim()) newErrors.name = 'Name is required';
+    if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) newErrors.email = 'Valid email is required';
+    if (!form.address.trim()) newErrors.address = 'Address is required';
+    if (!form.city.trim()) newErrors.city = 'City is required';
+    if (!form.zipCode.trim()) newErrors.zipCode = 'ZIP code is required';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validate()) {
+      onSubmit(form);
+    }
+  };
+
+  const updateField = (field: keyof CustomerInfo, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  const shipping = total > 50 ? 0 : 5.99;
+  const orderTotal = total + shipping;
+
   return (
-    <div className="flex gap-4 p-3 bg-white rounded-xl border border-[#d4a574]/10">
-      {/* Emoji thumbnail */}
-      <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-[#d4a574]/20 to-[#c4883a]/10 rounded-xl flex items-center justify-center shrink-0">
-        <span className="text-2xl sm:text-3xl">{item.product.emoji}</span>
-      </div>
-
-      {/* Details */}
-      <div className="flex-1 min-w-0">
-        <h5 className="font-semibold text-[#2c1810] text-sm sm:text-base truncate">
-          {item.product.name}
-        </h5>
-        <p className="text-xs text-[#5c3d2e]/60">{item.product.weight}</p>
-        <p className="text-sm font-bold text-[#c4883a] mt-1">
-          ${(item.product.price * item.quantity).toFixed(2)}
-        </p>
-      </div>
-
-      {/* Quantity controls */}
-      <div className="flex flex-col items-end justify-between">
-        <button
-          onClick={() => onRemove(item.product.id)}
-          className="text-[#5c3d2e]/40 hover:text-red-500 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
-        <div className="flex items-center gap-1.5 bg-[#faf6f1] rounded-lg border border-[#d4a574]/20">
-          <button
-            onClick={() => onUpdateQuantity(item.product.id, -1)}
-            className="w-7 h-7 flex items-center justify-center text-[#5c3d2e] hover:text-[#c4883a] transition-colors"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-            </svg>
-          </button>
-          <span className="text-sm font-medium text-[#2c1810] w-5 text-center">{item.quantity}</span>
-          <button
-            onClick={() => onUpdateQuantity(item.product.id, 1)}
-            className="w-7 h-7 flex items-center justify-center text-[#5c3d2e] hover:text-[#c4883a] transition-colors"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 fade-in" onClick={onClose}>
+      <div className="absolute inset-0 bg-[#2c1810]/60 backdrop-blur-sm"></div>
+      <div
+        className="relative bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl slide-up"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-[#d4a574]/20">
+          <h2 className="text-xl font-bold text-[#2c1810]">Checkout</h2>
+          <button onClick={onClose} className="p-2 hover:bg-[#faf6f1] rounded-full transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-5">
+          {/* Order Summary */}
+          <div className="bg-[#faf6f1] rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-[#5c3d2e] uppercase tracking-wide mb-3">Order Summary</h3>
+            <div className="space-y-2">
+              {items.map((item) => (
+                <div key={item.product.id} className="flex justify-between text-sm">
+                  <span className="text-[#5c3d2e]/70">{item.product.name} × {item.quantity}</span>
+                  <span className="font-medium">${(item.product.price * item.quantity).toFixed(2)}</span>
+                </div>
+              ))}
+              <div className="border-t border-[#d4a574]/20 pt-2 mt-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-[#5c3d2e]/70">Shipping</span>
+                  <span className="font-medium">{shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}</span>
+                </div>
+                <div className="flex justify-between mt-2">
+                  <span className="font-semibold text-[#2c1810]">Total</span>
+                  <span className="font-bold text-lg text-[#2c1810]">${orderTotal.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Customer Info */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-[#5c3d2e] uppercase tracking-wide">Shipping Information</h3>
+
+            <div>
+              <label className="block text-sm font-medium text-[#5c3d2e] mb-1">Full Name</label>
+              <input
+                type="text"
+                value={form.name}
+                onChange={(e) => updateField('name', e.target.value)}
+                className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c4883a]/40 ${errors.name ? 'border-red-300 bg-red-50' : 'border-[#d4a574]/30'}`}
+                placeholder="John Doe"
+              />
+              {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[#5c3d2e] mb-1">Email</label>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(e) => updateField('email', e.target.value)}
+                className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c4883a]/40 ${errors.email ? 'border-red-300 bg-red-50' : 'border-[#d4a574]/30'}`}
+                placeholder="john@example.com"
+              />
+              {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[#5c3d2e] mb-1">Address</label>
+              <input
+                type="text"
+                value={form.address}
+                onChange={(e) => updateField('address', e.target.value)}
+                className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c4883a]/40 ${errors.address ? 'border-red-300 bg-red-50' : 'border-[#d4a574]/30'}`}
+                placeholder="123 Coffee Street"
+              />
+              {errors.address && <p className="text-xs text-red-500 mt-1">{errors.address}</p>}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-[#5c3d2e] mb-1">City</label>
+                <input
+                  type="text"
+                  value={form.city}
+                  onChange={(e) => updateField('city', e.target.value)}
+                  className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c4883a]/40 ${errors.city ? 'border-red-300 bg-red-50' : 'border-[#d4a574]/30'}`}
+                  placeholder="Portland"
+                />
+                {errors.city && <p className="text-xs text-red-500 mt-1">{errors.city}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#5c3d2e] mb-1">ZIP Code</label>
+                <input
+                  type="text"
+                  value={form.zipCode}
+                  onChange={(e) => updateField('zipCode', e.target.value)}
+                  className={`w-full px-4 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c4883a]/40 ${errors.zipCode ? 'border-red-300 bg-red-50' : 'border-[#d4a574]/30'}`}
+                  placeholder="97201"
+                />
+                {errors.zipCode && <p className="text-xs text-red-500 mt-1">{errors.zipCode}</p>}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[#5c3d2e] mb-1">Phone (optional)</label>
+              <input
+                type="tel"
+                value={form.phone}
+                onChange={(e) => updateField('phone', e.target.value)}
+                className="w-full px-4 py-2.5 border border-[#d4a574]/30 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c4883a]/40"
+                placeholder="(555) 123-4567"
+              />
+            </div>
+          </div>
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {submitting ? (
+              <>
+                <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing Order...
+              </>
+            ) : (
+              <>
+                Place Order — ${orderTotal.toFixed(2)}
+              </>
+            )}
+          </button>
+
+          <p className="text-xs text-center text-[#5c3d2e]/40">
+            This is a simulated checkout. No real payment will be processed.
+          </p>
+        </form>
       </div>
     </div>
   );
 }
 
-// ─── Checkout Form ───────────────────────────────────────────────────────────
-
-function CheckoutForm({
-  cart,
-  cartTotal,
-  onComplete,
-}: {
-  cart: CartItem[];
-  cartTotal: number;
-  onComplete: () => void;
+// ====================
+// ORDER SUCCESS MODAL
+// ====================
+function OrderSuccessModal({ order, onDismiss }: {
+  order: { id: string; total: number; items: { product: Product; quantity: number }[]; createdAt: string };
+  onDismiss: () => void;
 }) {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    address: '',
-    city: '',
-    zip: '',
-    cardNumber: '',
-    expiry: '',
-    cvv: '',
-  });
-
-  const handleChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onComplete();
-  };
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Order Summary */}
-      <div className="bg-white rounded-xl p-4 border border-[#d4a574]/10">
-        <h4 className="font-semibold text-[#2c1810] text-sm mb-3">Order Summary</h4>
-        <div className="space-y-2">
-          {cart.map((item) => (
-            <div key={item.product.id} className="flex justify-between text-sm">
-              <span className="text-[#5c3d2e]/70 truncate pr-2">
-                {item.product.name} × {item.quantity}
-              </span>
-              <span className="font-medium text-[#2c1810] shrink-0">
-                ${(item.product.price * item.quantity).toFixed(2)}
-              </span>
-            </div>
-          ))}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 fade-in" onClick={onDismiss}>
+      <div className="absolute inset-0 bg-[#2c1810]/60 backdrop-blur-sm"></div>
+      <div
+        className="relative bg-white rounded-2xl max-w-md w-full shadow-2xl slide-up text-center p-8"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-16 h-16 bg-[#8b9e82]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-[#8b9e82]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
         </div>
-        <div className="flex justify-between pt-3 mt-3 border-t border-[#d4a574]/10">
-          <span className="font-semibold text-[#2c1810]">Total</span>
-          <span className="font-bold text-[#c4883a] text-lg">${cartTotal.toFixed(2)}</span>
-        </div>
-      </div>
 
-      {/* Contact Info */}
-      <div>
-        <h4 className="font-semibold text-[#2c1810] text-sm mb-3">Contact Information</h4>
-        <div className="space-y-3">
-          <input
-            type="text"
-            placeholder="Full Name"
-            value={formData.name}
-            onChange={(e) => handleChange('name', e.target.value)}
-            className="w-full px-4 py-2.5 bg-white border border-[#d4a574]/30 rounded-xl text-sm text-[#2c1810] placeholder:text-[#5c3d2e]/40 focus:outline-none focus:ring-2 focus:ring-[#c4883a]/30 focus:border-[#c4883a] transition-all"
-            required
-          />
-          <input
-            type="email"
-            placeholder="Email Address"
-            value={formData.email}
-            onChange={(e) => handleChange('email', e.target.value)}
-            className="w-full px-4 py-2.5 bg-white border border-[#d4a574]/30 rounded-xl text-sm text-[#2c1810] placeholder:text-[#5c3d2e]/40 focus:outline-none focus:ring-2 focus:ring-[#c4883a]/30 focus:border-[#c4883a] transition-all"
-            required
-          />
-        </div>
-      </div>
+        <h2 className="text-2xl font-bold text-[#2c1810] mb-2">Order Confirmed!</h2>
+        <p className="text-[#5c3d2e]/60 mb-6">Thank you for your purchase. Your coffee is on its way.</p>
 
-      {/* Shipping */}
-      <div>
-        <h4 className="font-semibold text-[#2c1810] text-sm mb-3">Shipping Address</h4>
-        <div className="space-y-3">
-          <input
-            type="text"
-            placeholder="Street Address"
-            value={formData.address}
-            onChange={(e) => handleChange('address', e.target.value)}
-            className="w-full px-4 py-2.5 bg-white border border-[#d4a574]/30 rounded-xl text-sm text-[#2c1810] placeholder:text-[#5c3d2e]/40 focus:outline-none focus:ring-2 focus:ring-[#c4883a]/30 focus:border-[#c4883a] transition-all"
-            required
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              type="text"
-              placeholder="City"
-              value={formData.city}
-              onChange={(e) => handleChange('city', e.target.value)}
-              className="w-full px-4 py-2.5 bg-white border border-[#d4a574]/30 rounded-xl text-sm text-[#2c1810] placeholder:text-[#5c3d2e]/40 focus:outline-none focus:ring-2 focus:ring-[#c4883a]/30 focus:border-[#c4883a] transition-all"
-              required
-            />
-            <input
-              type="text"
-              placeholder="ZIP Code"
-              value={formData.zip}
-              onChange={(e) => handleChange('zip', e.target.value)}
-              className="w-full px-4 py-2.5 bg-white border border-[#d4a574]/30 rounded-xl text-sm text-[#2c1810] placeholder:text-[#5c3d2e]/40 focus:outline-none focus:ring-2 focus:ring-[#c4883a]/30 focus:border-[#c4883a] transition-all"
-              required
-            />
+        <div className="bg-[#faf6f1] rounded-xl p-4 mb-6 text-left">
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-[#5c3d2e]/60">Order ID</span>
+            <span className="font-mono text-xs font-medium">{order.id}</span>
+          </div>
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-[#5c3d2e]/60">Items</span>
+            <span className="font-medium">{order.items.reduce((s, i) => s + i.quantity, 0)}</span>
+          </div>
+          <div className="flex justify-between text-sm border-t border-[#d4a574]/20 pt-2 mt-2">
+            <span className="font-semibold text-[#2c1810]">Total</span>
+            <span className="font-bold text-[#2c1810]">${order.total.toFixed(2)}</span>
           </div>
         </div>
+
+        <button onClick={onDismiss} className="w-full btn-primary">
+          Continue Shopping
+        </button>
       </div>
-
-      {/* Payment */}
-      <div>
-        <h4 className="font-semibold text-[#2c1810] text-sm mb-3">Payment Details</h4>
-        <div className="space-y-3">
-          <input
-            type="text"
-            placeholder="Card Number"
-            value={formData.cardNumber}
-            onChange={(e) => handleChange('cardNumber', e.target.value)}
-            className="w-full px-4 py-2.5 bg-white border border-[#d4a574]/30 rounded-xl text-sm text-[#2c1810] placeholder:text-[#5c3d2e]/40 focus:outline-none focus:ring-2 focus:ring-[#c4883a]/30 focus:border-[#c4883a] transition-all"
-            required
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <input
-              type="text"
-              placeholder="MM/YY"
-              value={formData.expiry}
-              onChange={(e) => handleChange('expiry', e.target.value)}
-              className="w-full px-4 py-2.5 bg-white border border-[#d4a574]/30 rounded-xl text-sm text-[#2c1810] placeholder:text-[#5c3d2e]/40 focus:outline-none focus:ring-2 focus:ring-[#c4883a]/30 focus:border-[#c4883a] transition-all"
-              required
-            />
-            <input
-              type="text"
-              placeholder="CVV"
-              value={formData.cvv}
-              onChange={(e) => handleChange('cvv', e.target.value)}
-              className="w-full px-4 py-2.5 bg-white border border-[#d4a574]/30 rounded-xl text-sm text-[#2c1810] placeholder:text-[#5c3d2e]/40 focus:outline-none focus:ring-2 focus:ring-[#c4883a]/30 focus:border-[#c4883a] transition-all"
-              required
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Submit */}
-      <button type="submit" className="w-full btn-primary text-center text-base py-3.5">
-        Place Order — ${cartTotal.toFixed(2)}
-      </button>
-
-      <p className="text-center text-xs text-[#5c3d2e]/40">
-        🔒 This is a simulated checkout. No real payment will be processed.
-      </p>
-    </form>
+    </div>
   );
 }
