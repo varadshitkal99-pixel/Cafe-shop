@@ -1,54 +1,127 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode in Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
   :root {
-    --color-cream: #faf6f1;
-    --color-warm-white: #fefcf9;
-    --color-espresso: #2c1810;
-    --color-mocha: #5c3d2e;
-    --color-caramel: #c4883a;
-    --color-latte: #d4a574;
-    --color-sage: #8b9e82;
+    /* Light theme (warm cream palette) */
+    --color-bg: #faf6f1;
+    --color-bg-elevated: #ffffff;
+    --color-bg-soft: #f5ede2;
+    --color-bg-muted: #faf6f1;
+    --color-text: #2c1810;
+    --color-text-muted: rgba(92, 61, 46, 0.6);
+    --color-text-faint: rgba(92, 61, 46, 0.4);
+    --color-accent: #c4883a;
+    --color-accent-soft: rgba(196, 136, 58, 0.1);
+    --color-accent-border: rgba(196, 136, 58, 0.2);
+    --color-primary: #5c3d2e;
+    --color-primary-hover: #3d2518;
+    --color-primary-text: #faf6f1;
+    --color-border: rgba(212, 165, 116, 0.3);
+    --color-border-soft: rgba(212, 165, 116, 0.1);
+    --color-success: #8b9e82;
+    --color-overlay: rgba(44, 24, 16, 0.6);
+    --color-input-bg: #ffffff;
+    --color-chip-bg: #faf6f1;
+    --color-chip-text: rgba(92, 61, 46, 0.7);
+    --color-chip-border: rgba(212, 165, 116, 0.2);
+    --color-hero-overlay: linear-gradient(135deg, rgba(44, 24, 16, 0.85) 0%, rgba(92, 61, 46, 0.6) 100%);
   }
 
-  body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background-color: var(--color-cream);
-    color: var(--color-espresso);
+  .dark {
+    /* Dark theme (rich espresso palette) */
+    --color-bg: #1a1210;
+    --color-bg-elevated: #241a16;
+    --color-bg-soft: #2a1f1a;
+    --color-bg-muted: #1f1613;
+    --color-text: #f5e6d3;
+    --color-text-muted: rgba(245, 230, 211, 0.65);
+    --color-text-faint: rgba(245, 230, 211, 0.4);
+    --color-accent: #e0a865;
+    --color-accent-soft: rgba(224, 168, 101, 0.12);
+    --color-accent-border: rgba(224, 168, 101, 0.25);
+    --color-primary: #d4a574;
+    --color-primary-hover: #e0b888;
+    --color-primary-text: #1a1210;
+    --color-border: rgba(212, 165, 116, 0.2);
+    --color-border-soft: rgba(212, 165, 116, 0.1);
+    --color-success: #a3b899;
+    --color-overlay: rgba(0, 0, 0, 0.7);
+    --color-input-bg: #2a1f1a;
+    --color-chip-bg: #2a1f1a;
+    --color-chip-text: rgba(245, 230, 211, 0.75);
+    --color-chip-border: rgba(212, 165, 116, 0.15);
+    --color-hero-overlay: linear-gradient(135deg, rgba(10, 6, 4, 0.9) 0%, rgba(26, 18, 16, 0.7) 100%);
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100%;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-latte) transparent;
+    scrollbar-color: var(--color-border) transparent;
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-[#5c3d2e] text-[#faf6f1] px-6 py-3 rounded-lg font-medium
-           hover:bg-[#3d2518] transition-all duration-300 ease-out
-           shadow-md hover:shadow-lg active:scale-[0.98];
+    background-color: var(--color-primary);
+    color: var(--color-primary-text);
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
+  .btn-primary:hover {
+    background-color: var(--color-primary-hover);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.15);
+  }
+  .btn-primary:active {
+    transform: scale(0.98);
   }
 
   .btn-secondary {
-    @apply border-2 border-[#5c3d2e] text-[#5c3d2e] px-6 py-3 rounded-lg font-medium
-           hover:bg-[#5c3d2e] hover:text-[#faf6f1] transition-all duration-300 ease-out;
+    border: 2px solid var(--color-primary);
+    color: var(--color-primary);
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+  .btn-secondary:hover {
+    background-color: var(--color-primary);
+    color: var(--color-primary-text);
   }
 
   .card-hover {
-    @apply transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl;
+    transition: all 0.3s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15);
   }
 
-  .fade-in {
-    animation: fadeIn 0.3s ease-out forwards;
-  }
+  .fade-in { animation: fadeIn 0.3s ease-out forwards; }
+  .slide-up { animation: slideUp 0.4s ease-out forwards; }
+  .slide-in-right { animation: slideInRight 0.3s ease-out forwards; }
 
-  .slide-up {
-    animation: slideUp 0.4s ease-out forwards;
-  }
-
-  .slide-in-right {
-    animation: slideInRight 0.3s ease-out forwards;
+  /* Theme transition helper */
+  .theme-transition,
+  .theme-transition *,
+  .theme-transition *::before,
+  .theme-transition *::after {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease !important;
   }
 }
 
