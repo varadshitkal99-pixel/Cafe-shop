@@ -37,9 +37,10 @@ export const ProductsAPI = {
         products = products.filter(
           (p) =>
             p.name.toLowerCase().includes(q) ||
-            p.origin.toLowerCase().includes(q) ||
+            (p.origin?.toLowerCase().includes(q) ?? false) ||
             p.flavorNotes.some((n) => n.toLowerCase().includes(q)) ||
-            p.description.toLowerCase().includes(q)
+            p.description.toLowerCase().includes(q) ||
+            (p.tags?.some((t) => t.toLowerCase().includes(q)) ?? false)
         );
       }
 

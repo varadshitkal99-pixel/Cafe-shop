@@ -20,8 +20,8 @@ export default function App() {
 
   const filters: SearchFilters = useMemo(() => ({
     query: debouncedSearch || undefined,
-    category: activeCategory !== 'all' ? activeCategory : undefined,
-    roast: activeRoast !== 'all' ? activeRoast : undefined,
+    category: activeCategory !== 'all' ? activeCategory as Product['category'] : undefined,
+    roast: activeRoast !== 'all' ? activeRoast as 'light' | 'medium' | 'dark' : undefined,
     sortBy: sortBy as SearchFilters['sortBy'],
   }), [debouncedSearch, activeCategory, activeRoast, sortBy]);
 
@@ -78,7 +78,7 @@ export default function App() {
               </div>
               <div>
                 <h1 className="text-lg sm:text-xl font-bold text-[#2c1810] tracking-tight">Ember & Brew</h1>
-                <p className="text-[10px] sm:text-xs text-[#5c3d2e]/60 tracking-widest uppercase">Specialty Coffee</p>
+                <p className="text-[10px] sm:text-xs text-[#5c3d2e]/60 tracking-widest uppercase">Pune, India</p>
               </div>
             </div>
 
@@ -90,7 +90,7 @@ export default function App() {
                 </svg>
                 <input
                   type="text"
-                  placeholder="Search coffees, origins, flavors..."
+                  placeholder="Search coffee, sandwiches, pastries..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#d4a574]/30 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-[#c4883a]/40 focus:border-[#c4883a] transition-all"
@@ -140,13 +140,13 @@ export default function App() {
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20">
           <div className="max-w-2xl">
-            <p className="text-[#c4883a] text-sm font-medium tracking-widest uppercase mb-3">Est. 2024</p>
+            <p className="text-[#c4883a] text-sm font-medium tracking-widest uppercase mb-3">📍 Pune, India</p>
             <h2 className="text-3xl sm:text-5xl font-bold leading-tight mb-4">
-              Exceptional Coffee,<br />
-              <span className="text-[#c4883a]">Thoughtfully Sourced</span>
+              Crafted with Love,<br />
+              <span className="text-[#c4883a]">Served Fresh Daily</span>
             </h2>
             <p className="text-[#faf6f1]/70 text-base sm:text-lg leading-relaxed max-w-lg">
-              From single-origin estates to artisanal blends, every bean is selected for its unique character and roasted to perfection.
+              From single-origin estates to artisanal sandwiches and pastries — everything handcrafted at our Pune café, roasted and baked to perfection.
             </p>
           </div>
         </div>
@@ -159,9 +159,13 @@ export default function App() {
           {/* Category Filters */}
           <div className="flex flex-wrap gap-2">
             {[
-              { value: 'all', label: 'All' },
-              { value: 'single-origin', label: 'Single Origin' },
-              { value: 'blend', label: 'Blends' },
+              { value: 'all', label: '🍽️ All' },
+              { value: 'single-origin', label: '☕ Single Origin' },
+              { value: 'blend', label: '☕ Blends' },
+              { value: 'sandwich', label: '🥪 Sandwiches' },
+              { value: 'pastry', label: '🥐 Pastries' },
+              { value: 'beverage', label: '🥤 Beverages' },
+              { value: 'snack', label: '🥑 Snacks' },
             ].map((cat) => (
               <button
                 key={cat.value}
@@ -338,8 +342,16 @@ function ProductCard({ product, index, onViewDetails, onAddToCart }: {
   onViewDetails: () => void;
   onAddToCart: () => void;
 }) {
-  const roastLabel = { light: 'Light Roast', medium: 'Medium Roast', dark: 'Dark Roast' }[product.roast];
-  const roastColor = { light: 'bg-amber-100 text-amber-800', medium: 'bg-orange-100 text-orange-800', dark: 'bg-stone-200 text-stone-800' }[product.roast];
+  const isCoffee = ['single-origin', 'blend', 'decaf'].includes(product.category);
+  const roastLabel = product.roast ? { light: 'Light Roast', medium: 'Medium Roast', dark: 'Dark Roast' }[product.roast] : null;
+  const roastColor = product.roast ? { light: 'bg-amber-100 text-amber-800', medium: 'bg-orange-100 text-orange-800', dark: 'bg-stone-200 text-stone-800' }[product.roast] : null;
+
+  const categoryLabel: Record<string, string> = {
+    sandwich: '🥪 Sandwich',
+    pastry: '🥐 Pastry',
+    beverage: '🥤 Beverage',
+    snack: '🥑 Snack',
+  };
 
   return (
     <div
@@ -353,15 +365,29 @@ function ProductCard({ product, index, onViewDetails, onAddToCart }: {
           alt={product.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
         />
-        <div className="absolute top-3 left-3">
-          <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${roastColor}`}>
-            {roastLabel}
-          </span>
+        <div className="absolute top-3 left-3 flex gap-1.5">
+          {isCoffee && roastLabel && roastColor && (
+            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${roastColor}`}>
+              {roastLabel}
+            </span>
+          )}
+          {!isCoffee && (
+            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-white/90 text-[#5c3d2e] backdrop-blur-sm">
+              {categoryLabel[product.category] || product.category}
+            </span>
+          )}
         </div>
-        <div className="absolute top-3 right-3">
-          <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-white/90 text-[#5c3d2e] backdrop-blur-sm">
-            {product.weight}
-          </span>
+        <div className="absolute top-3 right-3 flex gap-1.5">
+          {product.isVeg !== undefined && (
+            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 backdrop-blur-sm">
+              🌿 Veg
+            </span>
+          )}
+          {product.weight && (
+            <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-white/90 text-[#5c3d2e] backdrop-blur-sm">
+              {product.weight}
+            </span>
+          )}
         </div>
       </div>
 
@@ -370,7 +396,7 @@ function ProductCard({ product, index, onViewDetails, onAddToCart }: {
         <div className="flex items-start justify-between mb-2">
           <div>
             <h3 className="font-semibold text-[#2c1810] text-lg leading-tight">{product.name}</h3>
-            <p className="text-sm text-[#5c3d2e]/60 mt-0.5">{product.origin}</p>
+            <p className="text-sm text-[#5c3d2e]/60 mt-0.5">{product.origin || categoryLabel[product.category] || ''}</p>
           </div>
           <div className="flex items-center gap-1 text-sm">
             <span className="text-[#c4883a]">★</span>
@@ -378,7 +404,7 @@ function ProductCard({ product, index, onViewDetails, onAddToCart }: {
           </div>
         </div>
 
-        {/* Flavor Notes */}
+        {/* Flavor Notes / Tags */}
         <div className="flex flex-wrap gap-1.5 mt-3 mb-4">
           {product.flavorNotes.map((note) => (
             <span key={note} className="px-2 py-0.5 bg-[#faf6f1] text-[#5c3d2e]/70 text-xs rounded-full border border-[#d4a574]/20">
@@ -389,7 +415,7 @@ function ProductCard({ product, index, onViewDetails, onAddToCart }: {
 
         {/* Price & Actions */}
         <div className="flex items-center justify-between mt-auto pt-3 border-t border-[#d4a574]/10">
-          <span className="text-xl font-bold text-[#2c1810]">${product.price.toFixed(2)}</span>
+          <span className="text-xl font-bold text-[#2c1810]">₹{(product.price * 83).toFixed(0)}</span>
           <button
             onClick={onAddToCart}
             className="flex items-center gap-1.5 px-4 py-2 bg-[#5c3d2e] text-[#faf6f1] rounded-lg text-sm font-medium hover:bg-[#3d2518] transition-all active:scale-95"
@@ -442,7 +468,7 @@ function ProductDetailModal({ product, onClose, onAddToCart }: {
           <div className="flex items-start justify-between mb-4">
             <div>
               <h2 className="text-2xl sm:text-3xl font-bold text-[#2c1810]">{product.name}</h2>
-              <p className="text-[#5c3d2e]/60 mt-1">{product.origin}</p>
+              <p className="text-[#5c3d2e]/60 mt-1">{product.origin || product.category.replace('-', ' ')}</p>
             </div>
             <div className="flex items-center gap-1 bg-[#faf6f1] px-3 py-1.5 rounded-full">
               <span className="text-[#c4883a]">★</span>
@@ -451,18 +477,39 @@ function ProductDetailModal({ product, onClose, onAddToCart }: {
             </div>
           </div>
 
+          {/* Tags */}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {product.isVeg && (
+              <span className="px-2.5 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">🌿 Vegetarian</span>
+            )}
+            {product.spiceLevel && (
+              <span className="px-2.5 py-1 bg-red-50 text-red-700 text-xs font-medium rounded-full">
+                {product.spiceLevel === 'mild' ? '🌶️ Mild' : product.spiceLevel === 'medium' ? '🌶️🌶️ Medium' : '🌶️🌶️🌶️ Spicy'}
+              </span>
+            )}
+            {product.tags?.map((tag) => (
+              <span key={tag} className="px-2.5 py-1 bg-[#faf6f1] text-[#5c3d2e]/60 text-xs rounded-full border border-[#d4a574]/20 capitalize">
+                {tag}
+              </span>
+            ))}
+          </div>
+
           <p className="text-[#5c3d2e]/80 leading-relaxed mb-6">{product.description}</p>
 
           {/* Details */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-            <div className="bg-[#faf6f1] rounded-xl p-3 text-center">
-              <p className="text-xs text-[#5c3d2e]/50 uppercase tracking-wide">Roast</p>
-              <p className="font-semibold text-[#2c1810] capitalize mt-1">{product.roast}</p>
-            </div>
-            <div className="bg-[#faf6f1] rounded-xl p-3 text-center">
-              <p className="text-xs text-[#5c3d2e]/50 uppercase tracking-wide">Weight</p>
-              <p className="font-semibold text-[#2c1810] mt-1">{product.weight}</p>
-            </div>
+            {product.roast && (
+              <div className="bg-[#faf6f1] rounded-xl p-3 text-center">
+                <p className="text-xs text-[#5c3d2e]/50 uppercase tracking-wide">Roast</p>
+                <p className="font-semibold text-[#2c1810] capitalize mt-1">{product.roast}</p>
+              </div>
+            )}
+            {product.weight && (
+              <div className="bg-[#faf6f1] rounded-xl p-3 text-center">
+                <p className="text-xs text-[#5c3d2e]/50 uppercase tracking-wide">Size</p>
+                <p className="font-semibold text-[#2c1810] mt-1">{product.weight}</p>
+              </div>
+            )}
             <div className="bg-[#faf6f1] rounded-xl p-3 text-center">
               <p className="text-xs text-[#5c3d2e]/50 uppercase tracking-wide">Category</p>
               <p className="font-semibold text-[#2c1810] capitalize mt-1">{product.category.replace('-', ' ')}</p>
@@ -516,7 +563,7 @@ function ProductDetailModal({ product, onClose, onAddToCart }: {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
               </svg>
-              Add to Cart — ${(product.price * quantity).toFixed(2)}
+              Add to Cart — ₹{(product.price * quantity * 83).toFixed(0)}
             </button>
           </div>
         </div>
@@ -572,7 +619,7 @@ function CartSidebar({ items, total, onClose, onUpdateQuantity, onRemoveItem, on
                 <div className="flex-1 min-w-0">
                   <h4 className="font-medium text-[#2c1810] text-sm truncate">{item.product.name}</h4>
                   <p className="text-xs text-[#5c3d2e]/50 mt-0.5">{item.product.weight}</p>
-                  <p className="font-semibold text-[#2c1810] mt-1">${(item.product.price * item.quantity).toFixed(2)}</p>
+                  <p className="font-semibold text-[#2c1810] mt-1">₹{(item.product.price * item.quantity * 83).toFixed(0)}</p>
 
                   <div className="flex items-center gap-2 mt-2">
                     <div className="flex items-center border border-[#d4a574]/30 rounded-md overflow-hidden">
@@ -610,7 +657,7 @@ function CartSidebar({ items, total, onClose, onUpdateQuantity, onRemoveItem, on
           <div className="p-5 border-t border-[#d4a574]/20 bg-white">
             <div className="flex items-center justify-between mb-4">
               <span className="text-[#5c3d2e]/60">Subtotal</span>
-              <span className="text-xl font-bold text-[#2c1810]">${total.toFixed(2)}</span>
+              <span className="text-xl font-bold text-[#2c1810]">₹{(total * 83).toFixed(0)}</span>
             </div>
             <p className="text-xs text-[#5c3d2e]/40 mb-4">Shipping calculated at checkout</p>
             <button onClick={onCheckout} className="w-full btn-primary flex items-center justify-center gap-2">
@@ -640,7 +687,7 @@ function CheckoutModal({ items, total, submitting, onClose, onSubmit }: {
     name: '',
     email: '',
     address: '',
-    city: '',
+    city: 'Pune',
     zipCode: '',
     phone: '',
   });
@@ -671,8 +718,8 @@ function CheckoutModal({ items, total, submitting, onClose, onSubmit }: {
     }
   };
 
-  const shipping = total > 50 ? 0 : 5.99;
-  const orderTotal = total + shipping;
+  const shippingInr = (total * 83) > 500 ? 0 : 49;
+  const orderTotal = total + (shippingInr / 83);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 fade-in" onClick={onClose}>
@@ -699,17 +746,17 @@ function CheckoutModal({ items, total, submitting, onClose, onSubmit }: {
               {items.map((item) => (
                 <div key={item.product.id} className="flex justify-between text-sm">
                   <span className="text-[#5c3d2e]/70">{item.product.name} × {item.quantity}</span>
-                  <span className="font-medium">${(item.product.price * item.quantity).toFixed(2)}</span>
+                  <span className="font-medium">₹{(item.product.price * item.quantity * 83).toFixed(0)}</span>
                 </div>
               ))}
               <div className="border-t border-[#d4a574]/20 pt-2 mt-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-[#5c3d2e]/70">Shipping</span>
-                  <span className="font-medium">{shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}</span>
+                  <span className="font-medium">{shippingInr === 0 ? 'Free' : `₹${shippingInr}`}</span>
                 </div>
                 <div className="flex justify-between mt-2">
                   <span className="font-semibold text-[#2c1810]">Total</span>
-                  <span className="font-bold text-lg text-[#2c1810]">${orderTotal.toFixed(2)}</span>
+                  <span className="font-bold text-lg text-[#2c1810]">₹{(orderTotal * 83).toFixed(0)}</span>
                 </div>
               </div>
             </div>
@@ -808,7 +855,7 @@ function CheckoutModal({ items, total, submitting, onClose, onSubmit }: {
               </>
             ) : (
               <>
-                Place Order — ${orderTotal.toFixed(2)}
+                Place Order — ₹{(orderTotal * 83).toFixed(0)}
               </>
             )}
           </button>
@@ -843,7 +890,7 @@ function OrderSuccessModal({ order, onDismiss }: {
         </div>
 
         <h2 className="text-2xl font-bold text-[#2c1810] mb-2">Order Confirmed!</h2>
-        <p className="text-[#5c3d2e]/60 mb-6">Thank you for your purchase. Your coffee is on its way.</p>
+        <p className="text-[#5c3d2e]/60 mb-6">Thank you! Your order is being prepared at our Pune café.</p>
 
         <div className="bg-[#faf6f1] rounded-xl p-4 mb-6 text-left">
           <div className="flex justify-between text-sm mb-2">
@@ -856,7 +903,7 @@ function OrderSuccessModal({ order, onDismiss }: {
           </div>
           <div className="flex justify-between text-sm border-t border-[#d4a574]/20 pt-2 mt-2">
             <span className="font-semibold text-[#2c1810]">Total</span>
-            <span className="font-bold text-[#2c1810]">${order.total.toFixed(2)}</span>
+            <span className="font-bold text-[#2c1810]">₹{(order.total * 83).toFixed(0)}</span>
           </div>
         </div>
 

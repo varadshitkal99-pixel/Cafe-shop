@@ -1,19 +1,31 @@
 // Backend Models / Types
 
+export type ProductCategory =
+  | 'single-origin'
+  | 'blend'
+  | 'decaf'
+  | 'sandwich'
+  | 'pastry'
+  | 'beverage'
+  | 'snack';
+
 export interface Product {
   id: string;
   name: string;
-  origin: string;
-  category: 'single-origin' | 'blend' | 'decaf';
+  origin?: string;
+  category: ProductCategory;
   price: number;
-  weight: string;
-  roast: 'light' | 'medium' | 'dark';
+  weight?: string;
+  roast?: 'light' | 'medium' | 'dark';
   flavorNotes: string[];
   description: string;
   image: string;
   inStock: boolean;
   rating: number;
   reviewCount: number;
+  tags?: string[];
+  isVeg?: boolean;
+  spiceLevel?: 'mild' | 'medium' | 'spicy';
 }
 
 export interface CartItem {
@@ -26,7 +38,7 @@ export interface Order {
   items: CartItem[];
   total: number;
   customer: CustomerInfo;
-  status: 'pending' | 'confirmed' | 'shipped' | 'delivered';
+  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered';
   createdAt: string;
 }
 
@@ -52,7 +64,7 @@ export interface ApiResponse<T> {
 
 export interface SearchFilters {
   query?: string;
-  category?: string;
-  roast?: string;
+  category?: ProductCategory;
+  roast?: 'light' | 'medium' | 'dark';
   sortBy?: 'price-asc' | 'price-desc' | 'name' | 'rating';
 }
